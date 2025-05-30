@@ -196,10 +196,10 @@ while cap.isOpened():
         [int(w*1.0), int(h*0.95)],
     ])
     pts2 = np.float32([
-        [0, 540], [0, 0], [960, 0], [960, 540]
+        [0, h], [0, 0], [w, 0], [w, h]
     ])
     M = cv.getPerspectiveTransform(pts1, pts2)
-    perspectiveImg = cv.warpPerspective(frame, M, (960, 540))
+    perspectiveImg = cv.warpPerspective(frame, M, (w, h))
 
     # 9. 결과 출력
     cv.imshow('Overlap Lane', overlapImage)
