@@ -77,7 +77,7 @@ def image_filtering(img_bgr, l_thresh, y_thresh, s_thresh):
     masked_gray = cv.bitwise_and(gray, gray, mask=combined_mask)
 
     # LAB 색공간 (조명 변화에 강함)
-    lab = cv.cvtColor(enhanced_lab, cv.COLOR_BGR2YUV)
+    lab = cv.cvtColor(enhanced_lab, cv.COLOR_BGR2LAB)
     l_channel = lab[:,:,0]
     _, lab_binary = cv.threshold(l_channel, l_thresh[0], 255, cv.THRESH_BINARY)
 
