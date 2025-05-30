@@ -187,7 +187,7 @@ while cap.isOpened():
     lane_pts = np.array([pt2[0], pt1[0], pt2[1], pt1[1]], np.int32)
     cv.fillConvexPoly(imgOut, lane_pts, (255, 0, 0))
     overlapImage = cv.addWeighted(frame, 0.6, imgOut, 0.4, 0)
-
+ 
     # 8. Bird's Eye View 변환
     pts1 = np.float32([
         [int(w*0.0), int(h*0.95)],
