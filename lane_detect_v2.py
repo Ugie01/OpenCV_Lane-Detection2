@@ -1,15 +1,23 @@
 import cv2 as cv
 import numpy as np
 import time
+import yt_dlp
 
 # OpenCV 버전 확인
 print(cv.__version__)
 
+
 # 동영상 파일 및 출력 설정
-video_path = 'line_detect_night.mp4'
-cap = cv.VideoCapture(video_path)
 fourcc = cv.VideoWriter_fourcc(*'mp4v')  # MP4 코덱
 out = cv.VideoWriter('output.mp4', fourcc, 30.0, (640,360))  # 출력 파일 설정
+url = "https://www.youtube.com/watch?v=sJ-5u1S5Cxc&t=9149s"  # 유튜브 영상 URL
+
+ydl_opts = {}
+with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    info_dict = ydl.extract_info(url, download=False)
+    video_url = info_dict.get("url", None)
+
+cap = cv.VideoCapture(video_url)
 
 # 시작 프레임 계산
 fps = cap.get(cv.CAP_PROP_FPS)
@@ -74,7 +82,7 @@ def image_filtering(img_bgr, l_thresh, y_thresh, s_thresh):
     l_clahe = clahe.apply(l)
     enhanced_lab = cv.merge((l_clahe, a, b))
     enhanced_lab = cv.cvtColor(enhanced_lab, cv.COLOR_LAB2BGR)
-    cv.imshow("CLAHE after", enhanced_lab)
+    # cv.imshow("CLAHE after", enhanced_lab)
 
     # HSV 색상 필터링
     hsv = cv.cvtColor(enhanced_lab, cv.COLOR_BGR2HSV)
@@ -83,26 +91,21 @@ def image_filtering(img_bgr, l_thresh, y_thresh, s_thresh):
     mask_blue = cv.inRange(hsv, (80,40,80), (130,255,255))
     combined_mask = cv.bitwise_or(mask_white, mask_yellow)
     combined_mask = cv.bitwise_or(combined_mask, mask_blue)
-    cv.imshow("combined_mask", combined_mask)
+    # cv.imshow("combined_mask", combined_mask)
 
     # LAB/YUV 임계값 처리
     lab_binary = cv.inRange(cv.cvtColor(enhanced_lab, cv.COLOR_BGR2LAB)[:,:,0], l_thresh[0], 255)
     yuv_binary = cv.inRange(cv.cvtColor(enhanced_lab, cv.COLOR_BGR2YUV)[:,:,0], y_thresh[0], 255)
-    cv.imshow("lab_binary", lab_binary)
-    cv.imshow("yuv_binary", yuv_binary)
+    # cv.imshow("lab_binary", lab_binary)
+    # cv.imshow("yuv_binary", yuv_binary)
 
     # 결과 결합
     combined = cv.bitwise_and(lab_binary, yuv_binary)
     masked = cv.bitwise_and(combined, combined, mask=combined_mask)
 
-    cv.imshow("masked", masked)
-    # Sobel 엣지 검출
-    sobelx = cv.Sobel(masked, cv.CV_64F, 1, 0, ksize=3)
-    abs_sobel = cv.convertScaleAbs(sobelx)
-    _, sobel_binary = cv.threshold(abs_sobel, s_thresh, 255, cv.THRESH_BINARY)
-    cv.imshow("sobel_binary", sobel_binary)
+    # cv.imshow("masked", masked)
 
-    return sobel_binary
+    return masked
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -144,8 +147,18 @@ while cap.isOpened():
     lane_binary = cv.bitwise_and(lane_binary, roi_mask)
     cv.imshow("ROI_lane_binary", lane_binary)
 
+    # Sobel 엣지 검출
+    sobelx = cv.Sobel(lane_binary, cv.CV_64F, 1, 0, ksize=3)
+    abs_sobel = cv.convertScaleAbs(sobelx)
+    _, sobel_binary = cv.threshold(abs_sobel, sobel_thresh, 255, cv.THRESH_BINARY)
+    cv.imshow("sobel_binary", sobel_binary)
+
     # 허프 변환 기반 차선 검출
     edges = cv.Canny(lane_binary, 50, 200)
+    cv.imshow("edges_b", edges)
+
+    edges = cv.bitwise_or(edges, sobel_binary)
+    cv.imshow("edges_a", edges)
 
     lines = cv.HoughLines(edges, 1, np.pi/180, 30)
     imgHough = frame.copy()
@@ -189,6 +202,8 @@ while cap.isOpened():
     imgOut = np.zeros_like(frame)
     cv.rectangle(imgHough, pt1[0], pt2[0], (0, 128, 256), 2)
     cv.rectangle(imgHough, pt1[1], pt2[1], (128, 0, 0), 2)
+    # cv.imshow("imgHough", imgHough)
+
     lane_pts = np.array([pt2[0], pt1[0], pt2[1], pt1[1]], np.int32)
     cv.fillConvexPoly(imgOut, lane_pts, (255, 0, 0))
     overlapImage = cv.addWeighted(frame, 0.6, imgOut, 0.4, 0)
@@ -223,8 +238,10 @@ while cap.isOpened():
     cv.imshow('Overlap Lane', overlapImage)
     # cv.imshow('Birds Eye View', perspectiveImg)
     out.write(overlapImage)
+
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
+
 
 end = time.time()
 avg_fps = frame_count / (end - start)
